@@ -184,7 +184,7 @@ def obtener_empleado_por_rut(rut: str):
             raise ex
         raise HTTPException(status_code=500, detail=str(ex))
 
-@router.post("/login")
+@router.post("/login", status_code=200)
 def login_empleado(login_data: LoginRequest):
     try:
         # Obtener conexión a Supabase
