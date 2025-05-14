@@ -1,6 +1,12 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
 from app.database import get_conexion
 from typing import Optional, Dict
+from pydantic import BaseModel
+
+# Modelo para la petición de login
+class LoginRequest(BaseModel):
+    correo: str
+    contrasena: str
 
 router = APIRouter(
     prefix="/empleados",
@@ -179,13 +185,13 @@ def obtener_empleado_por_rut(rut: str):
         raise HTTPException(status_code=500, detail=str(ex))
 
 @router.post("/login")
-def login_empleado(correo: str, contrasena: str):
+def login_empleado(login_data: LoginRequest):
     try:
         # Obtener conexión a Supabase
         supabase = get_conexion()
         
         # Buscar empleado por correo y contraseña
-        response = supabase.table('empleado').select('*').eq('correo', correo).execute()
+        response = supabase.table('empleado').select('*').eq('correo', login_data.correo).execute()
         
         # Verificar si se encontró el empleado
         if not response.data or len(response.data) == 0:
@@ -195,7 +201,7 @@ def login_empleado(correo: str, contrasena: str):
         empleado = response.data[0]
         
         # Verificar contraseña
-        if empleado['contrasena'] != contrasena:
+        if empleado['contrasena'] != login_data.contrasena:
             raise HTTPException(status_code=401, detail="Contraseña incorrecta")
         
         # Eliminar contraseña del objeto de respuesta por seguridad

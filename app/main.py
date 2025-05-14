@@ -1,10 +1,20 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.routers import clientes, empleados
 
 app = FastAPI(
     title="API de gestión de SpinZone",
     version="1.0.0",
     description="API para gestionar clientes y empleados usando FastAPI y Supabase"
+)
+
+# Configurar CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "https://sz-frontend.vercel.app"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Incluir rutas
