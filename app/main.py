@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.routers import usuarios, clientes, empleados
+from app.routers import clientes, empleados
 
 app = FastAPI(
     title="API de gestión de SpinZone",
