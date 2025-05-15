@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import clientes, empleados, pedidos
+from app.routers import clientes, empleados, pedidos, pedido_producto
 
 app = FastAPI(
     title="API de gestión de SpinZone",
@@ -21,6 +21,7 @@ app.add_middleware(
 app.include_router(clientes.router)
 app.include_router(empleados.router)
 app.include_router(pedidos.router)
+app.include_router(pedido_producto.router)
 
 @app.get("/")
 def read_root():
@@ -30,6 +31,7 @@ def read_root():
         "endpoints": [
             {"ruta": "/clientes", "descripcion": "Gestión de clientes"},
             {"ruta": "/empleados", "descripcion": "Gestión de empleados"},
-            {"ruta": "/pedidos", "descripcion": "Gestión de pedidos"}
+            {"ruta": "/pedidos", "descripcion": "Gestión de pedidos"},
+            {"ruta": "/pedido-producto", "descripcion": "Gestión de productos en pedidos"}
         ]
     }
