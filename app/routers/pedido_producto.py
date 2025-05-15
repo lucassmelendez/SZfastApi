@@ -5,11 +5,11 @@ from pydantic import BaseModel
 
 # Modelos para pedido_producto
 class PedidoProductoBase(BaseModel):
-    id_pedido: int
-    id_producto: int
     cantidad: int
     precio_unitario: int
     subtotal: int
+    id_pedido: int
+    id_producto: int
 
 class PedidoProductoCreate(PedidoProductoBase):
     pass
@@ -84,11 +84,11 @@ def agregar_producto_a_pedido(pedido_producto: PedidoProductoCreate):
         
         # Preparar datos del producto para insertar
         datos_producto = {
-            "id_pedido": pedido_producto.id_pedido,
-            "id_producto": pedido_producto.id_producto,
             "cantidad": pedido_producto.cantidad,
             "precio_unitario": pedido_producto.precio_unitario,
-            "subtotal": pedido_producto.subtotal
+            "subtotal": pedido_producto.subtotal,
+            "id_pedido": pedido_producto.id_pedido,
+            "id_producto": pedido_producto.id_producto
         }
         
         print(f"Intentando insertar producto {datos_producto['id_producto']} en pedido {datos_producto['id_pedido']}")
@@ -146,11 +146,23 @@ def agregar_multiples_productos(id_pedido: int, productos: ProductosEnPedido):
         for producto in productos.productos:
             # Asegurarse de que el id_pedido sea correcto
             if producto.id_pedido != id_pedido:
-                producto_dict = producto.dict()
-                producto_dict['id_pedido'] = id_pedido
+                producto_dict = {
+                    "cantidad": producto.cantidad,
+                    "precio_unitario": producto.precio_unitario,
+                    "subtotal": producto.subtotal,
+                    "id_pedido": id_pedido,
+                    "id_producto": producto.id_producto
+                }
                 productos_a_insertar.append(producto_dict)
             else:
-                productos_a_insertar.append(producto.dict())
+                producto_dict = {
+                    "cantidad": producto.cantidad,
+                    "precio_unitario": producto.precio_unitario,
+                    "subtotal": producto.subtotal,
+                    "id_pedido": producto.id_pedido,
+                    "id_producto": producto.id_producto
+                }
+                productos_a_insertar.append(producto_dict)
         
         print(f"Intentando insertar {len(productos_a_insertar)} productos en el pedido {id_pedido}")
         print(f"Primer producto: {productos_a_insertar[0] if productos_a_insertar else 'No hay productos'}")
