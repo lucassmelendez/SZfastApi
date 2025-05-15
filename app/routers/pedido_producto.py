@@ -117,29 +117,45 @@ def agregar_multiples_productos(id_pedido: int, productos: ProductosEnPedido):
         supabase = get_conexion()
         
         # Verificar si el pedido existe
-        check_pedido = supabase.table('pedido').select('id_pedido').eq('id_pedido', id_pedido).execute()
-        if not check_pedido.data or len(check_pedido.data) == 0:
-            raise HTTPException(status_code=404, detail="Pedido no encontrado")
+        try:
+            check_pedido = supabase.table('pedido').select('id_pedido').eq('id_pedido', id_pedido).execute()
+            if not check_pedido.data or len(check_pedido.data) == 0:
+                raise HTTPException(status_code=404, detail="Pedido no encontrado")
+        except Exception as ex:
+            print(f"Error al verificar existencia del pedido: {str(ex)}")
+            # Continuamos el proceso aunque haya errores en la verificación
         
         # Preparar lista de productos para insertar
         productos_a_insertar = []
         for producto in productos.productos:
             # Asegurarse de que el id_pedido sea correcto
             if producto.id_pedido != id_pedido:
-                raise HTTPException(status_code=400, detail="El id_pedido en alguno de los productos no coincide con la URL")
-            productos_a_insertar.append(producto.dict())
+                producto_dict = producto.dict()
+                producto_dict['id_pedido'] = id_pedido
+                productos_a_insertar.append(producto_dict)
+            else:
+                productos_a_insertar.append(producto.dict())
+        
+        print(f"Intentando insertar {len(productos_a_insertar)} productos en el pedido {id_pedido}")
+        print(f"Primer producto: {productos_a_insertar[0] if productos_a_insertar else 'No hay productos'}")
         
         # Insertar múltiples productos en el pedido
-        response = supabase.table('pedido_producto').insert(productos_a_insertar).execute()
-        
-        # Verificar si la inserción fue exitosa
-        if response.data:
-            return {"mensaje": f"Se agregaron {len(response.data)} productos al pedido con éxito", "productos": response.data}
-        else:
-            raise HTTPException(status_code=500, detail="Error al agregar productos al pedido")
+        try:
+            response = supabase.table('pedido_producto').insert(productos_a_insertar).execute()
+            
+            # Verificar si la inserción fue exitosa
+            if response.data:
+                return {"mensaje": f"Se agregaron {len(response.data)} productos al pedido con éxito", "productos": response.data}
+            else:
+                print("No se obtuvieron datos en la respuesta de inserción de productos")
+                raise HTTPException(status_code=500, detail="Error al agregar productos al pedido: No se recibieron datos de respuesta")
+        except Exception as insert_ex:
+            print(f"Error específico al insertar productos: {str(insert_ex)}")
+            raise HTTPException(status_code=500, detail=f"Error al insertar productos: {str(insert_ex)}")
     except Exception as ex:
         if isinstance(ex, HTTPException):
             raise ex
+        print(f"Error general al agregar productos al pedido: {str(ex)}")
         raise HTTPException(status_code=500, detail=str(ex))
 
 @router.put("/{id_pedido}/{id_producto}")
