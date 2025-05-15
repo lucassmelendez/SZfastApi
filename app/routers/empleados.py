@@ -60,8 +60,7 @@ def agregar_empleado(
     contrasena: str, 
     direccion: str, 
     telefono: str, 
-    rol_id: int, 
-    informe_id: int
+    rol_id: int
 ):
     try:
         # Obtener conexión a Supabase
@@ -76,8 +75,7 @@ def agregar_empleado(
             "contrasena": contrasena,
             "direccion": direccion,
             "telefono": telefono,
-            "rol_id": rol_id,
-            "informe_id": informe_id
+            "rol_id": rol_id
         }).execute()
         
         # Verificar si la inserción fue exitosa
@@ -98,12 +96,11 @@ def actualizar_empleado(
     contrasena: Optional[str] = None,
     direccion: Optional[str] = None,
     telefono: Optional[str] = None,
-    rol_id: Optional[int] = None,
-    informe_id: Optional[int] = None
+    rol_id: Optional[int] = None
 ):
     try:
         # Verificar que al menos un campo sea proporcionado
-        if not any([nombre, apellido, rut, correo, contrasena, direccion, telefono, rol_id, informe_id]):
+        if not any([nombre, apellido, rut, correo, contrasena, direccion, telefono, rol_id]):
             raise HTTPException(status_code=400, detail="Debe proporcionar al menos un campo para actualizar")
         
         # Obtener conexión a Supabase
@@ -132,8 +129,6 @@ def actualizar_empleado(
             datos_actualizar["telefono"] = telefono
         if rol_id is not None:
             datos_actualizar["rol_id"] = rol_id
-        if informe_id is not None:
-            datos_actualizar["informe_id"] = informe_id
         
         # Actualizar empleado
         response = supabase.table('empleado').update(datos_actualizar).eq('id_empleado', id_empleado).execute()
