@@ -78,16 +78,42 @@ def crear_pedido(pedido: PedidoCreate):
         if not datos_pedido.get("fecha"):
             datos_pedido["fecha"] = datetime.now().isoformat()
         
+        # Verificar que el cliente existe
+        id_cliente = datos_pedido.get("id_cliente")
+        check_cliente = supabase.table('cliente').select('id_cliente').eq('id_cliente', id_cliente).execute()
+        if not check_cliente.data or len(check_cliente.data) == 0:
+            raise HTTPException(status_code=404, detail=f"Cliente con ID {id_cliente} no encontrado")
+        
+        # Verificar que el estado existe
+        id_estado = datos_pedido.get("id_estado")
+        check_estado = supabase.table('estado').select('id_estado').eq('id_estado', id_estado).execute()
+        if not check_estado.data or len(check_estado.data) == 0:
+            raise HTTPException(status_code=404, detail=f"Estado con ID {id_estado} no encontrado")
+        
+        # Verificar que el estado de envío existe
+        id_estado_envio = datos_pedido.get("id_estado_envio")
+        check_estado_envio = supabase.table('estado_envio').select('id_estado_envio').eq('id_estado_envio', id_estado_envio).execute()
+        if not check_estado_envio.data or len(check_estado_envio.data) == 0:
+            raise HTTPException(status_code=404, detail=f"Estado de envío con ID {id_estado_envio} no encontrado")
+        
+        # Verificar que el medio de pago existe
+        medio_pago_id = datos_pedido.get("medio_pago_id")
+        check_medio_pago = supabase.table('medio_pago').select('id_medio_pago').eq('id_medio_pago', medio_pago_id).execute()
+        if not check_medio_pago.data or len(check_medio_pago.data) == 0:
+            raise HTTPException(status_code=404, detail=f"Medio de pago con ID {medio_pago_id} no encontrado")
+        
         # Insertar nuevo pedido
         response = supabase.table('pedido').insert(datos_pedido).execute()
         
         # Verificar si la inserción fue exitosa
-        if response.data:
+        if response.data and len(response.data) > 0:
             return {"mensaje": "Pedido creado con éxito", "pedido": response.data[0]}
         else:
-            raise HTTPException(status_code=500, detail="Error al crear pedido")
+            raise HTTPException(status_code=500, detail="Error al crear pedido: No se recibieron datos de respuesta")
     except Exception as ex:
-        raise HTTPException(status_code=500, detail=str(ex))
+        if isinstance(ex, HTTPException):
+            raise ex
+        raise HTTPException(status_code=500, detail=f"Error al crear pedido: {str(ex)}")
 
 @router.put("/{id_pedido}")
 def actualizar_pedido(id_pedido: int, pedido: PedidoUpdate):

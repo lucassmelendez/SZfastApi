@@ -8,6 +8,17 @@ class LoginRequest(BaseModel):
     correo: str
     contrasena: str
 
+# Modelo para actualización de cliente
+class ClienteUpdate(BaseModel):
+    nombre: Optional[str] = None
+    apellido: Optional[str] = None
+    correo: Optional[str] = None
+    telefono: Optional[str] = None
+    direccion: Optional[str] = None
+    id_rol: Optional[int] = None
+    rut: Optional[str] = None
+    contrasena: Optional[str] = None
+
 router = APIRouter(
     prefix="/clientes",
     tags=["Clientes"]
@@ -89,18 +100,12 @@ def agregar_cliente(
 @router.put("/{id_cliente}")
 def actualizar_cliente(
     id_cliente: int,
-    nombre: Optional[str] = None,
-    apellido: Optional[str] = None,
-    correo: Optional[str] = None,
-    telefono: Optional[str] = None,
-    direccion: Optional[str] = None,
-    id_rol: Optional[int] = None,
-    rut: Optional[str] = None,
-    contrasena: Optional[str] = None
+    cliente: ClienteUpdate
 ):
     try:
         # Verificar que al menos un campo sea proporcionado
-        if not any([nombre, apellido, correo, telefono, direccion, id_rol, rut, contrasena]):
+        datos_actualizar = {k: v for k, v in cliente.dict().items() if v is not None}
+        if not datos_actualizar:
             raise HTTPException(status_code=400, detail="Debe proporcionar al menos un campo para actualizar")
         
         # Obtener conexión a Supabase
@@ -110,25 +115,6 @@ def actualizar_cliente(
         check_response = supabase.table('cliente').select('id_cliente').eq('id_cliente', id_cliente).execute()
         if not check_response.data or len(check_response.data) == 0:
             raise HTTPException(status_code=404, detail="Cliente no encontrado")
-        
-        # Crear diccionario con campos a actualizar
-        datos_actualizar = {}
-        if nombre is not None:
-            datos_actualizar["nombre"] = nombre
-        if apellido is not None:
-            datos_actualizar["apellido"] = apellido
-        if correo is not None:
-            datos_actualizar["correo"] = correo
-        if telefono is not None:
-            datos_actualizar["telefono"] = telefono
-        if direccion is not None:
-            datos_actualizar["direccion"] = direccion
-        if id_rol is not None:
-            datos_actualizar["id_rol"] = id_rol
-        if rut is not None:
-            datos_actualizar["rut"] = rut
-        if contrasena is not None:
-            datos_actualizar["contrasena"] = contrasena
         
         # Actualizar cliente
         response = supabase.table('cliente').update(datos_actualizar).eq('id_cliente', id_cliente).execute()
