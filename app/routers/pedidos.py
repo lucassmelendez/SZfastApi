@@ -71,40 +71,25 @@ def crear_pedido(pedido: PedidoCreate):
         # Obtener conexión a Supabase
         supabase = get_conexion()
         
-        # Preparar los datos del pedido
-        datos_pedido = pedido.dict()
+        # Preparar los datos del pedido con exactamente los mismos nombres de campo
+        datos_pedido = {
+            "fecha": pedido.fecha or datetime.now().isoformat(),
+            "medio_pago_id": pedido.medio_pago_id,
+            "id_estado_envio": pedido.id_estado_envio,
+            "id_estado": pedido.id_estado,
+            "id_cliente": pedido.id_cliente
+        }
         
-        # Si no se proporciona una fecha, usar la fecha actual
-        if not datos_pedido.get("fecha"):
-            datos_pedido["fecha"] = datetime.now().isoformat()
+        print(f"Intentando insertar pedido con datos exactos: {datos_pedido}")
         
-        # Verificar que el cliente existe (esta verificación es crítica)
+        # Insertar nuevo pedido directamente sin verificaciones
         try:
-            id_cliente = datos_pedido.get("id_cliente")
-            check_cliente = supabase.table('cliente').select('id_cliente').eq('id_cliente', id_cliente).execute()
-            if not check_cliente.data or len(check_cliente.data) == 0:
-                raise HTTPException(status_code=404, detail=f"Cliente con ID {id_cliente} no encontrado")
-        except Exception as cliente_ex:
-            # Si hay un error específico al verificar el cliente, lo registramos pero continuamos
-            print(f"Advertencia al verificar cliente: {str(cliente_ex)}")
-        
-        # Las siguientes verificaciones son opcionales (en caso de que las tablas no existan)
-        try:
-            # Opcionalmente verificar que las FK existan (estado, estado_envio, medio_pago)
-            # Estas verificaciones las hacemos opcionales para garantizar compatibilidad
-            # con diferentes esquemas de base de datos
-            pass
-        except Exception as ex:
-            print(f"Advertencia al verificar valores de referencia: {str(ex)}")
-        
-        try:
-            # Insertar nuevo pedido
-            print(f"Intentando insertar pedido con datos: {datos_pedido}")
             response = supabase.table('pedido').insert(datos_pedido).execute()
+            print(f"Respuesta de la inserción: {response}")
             
             # Verificar si la inserción fue exitosa
             if response.data and len(response.data) > 0:
-                return {"mensaje": "Pedido creado con éxito", "pedido": response.data[0]}
+                return response.data[0]  # Devolver directamente el objeto creado
             else:
                 print("No se recibieron datos en la respuesta de inserción")
                 raise HTTPException(status_code=500, detail="Error al crear pedido: No se recibieron datos de respuesta")

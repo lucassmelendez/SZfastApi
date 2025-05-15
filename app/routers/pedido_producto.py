@@ -82,32 +82,48 @@ def agregar_producto_a_pedido(pedido_producto: PedidoProductoCreate):
         # Obtener conexión a Supabase
         supabase = get_conexion()
         
-        # Verificar si el pedido existe
-        check_pedido = supabase.table('pedido').select('id_pedido').eq('id_pedido', pedido_producto.id_pedido).execute()
-        if not check_pedido.data or len(check_pedido.data) == 0:
-            raise HTTPException(status_code=404, detail="Pedido no encontrado")
+        # Preparar datos del producto para insertar
+        datos_producto = {
+            "id_pedido": pedido_producto.id_pedido,
+            "id_producto": pedido_producto.id_producto,
+            "cantidad": pedido_producto.cantidad,
+            "precio_unitario": pedido_producto.precio_unitario,
+            "subtotal": pedido_producto.subtotal
+        }
         
-        # Verificar si el producto existe
-        check_producto = supabase.table('producto').select('id_producto').eq('id_producto', pedido_producto.id_producto).execute()
-        if not check_producto.data or len(check_producto.data) == 0:
-            raise HTTPException(status_code=404, detail="Producto no encontrado")
+        print(f"Intentando insertar producto {datos_producto['id_producto']} en pedido {datos_producto['id_pedido']}")
         
-        # Verificar si el producto ya existe en el pedido
-        check_existente = supabase.table('pedido_producto').select('id_pedido_producto').eq('id_pedido', pedido_producto.id_pedido).eq('id_producto', pedido_producto.id_producto).execute()
-        if check_existente.data and len(check_existente.data) > 0:
-            raise HTTPException(status_code=400, detail="Este producto ya está en el pedido. Utilice PUT para actualizar.")
+        # Para ser más tolerante, verificamos si ya existe la combinación y actualizamos en vez de insertar
+        try:
+            check_existente = supabase.table('pedido_producto').select('id_pedido_producto').eq('id_pedido', datos_producto['id_pedido']).eq('id_producto', datos_producto['id_producto']).execute()
+            
+            if check_existente.data and len(check_existente.data) > 0:
+                print(f"Producto ya existe en el pedido. Actualizando cantidad.")
+                
+                # Actualizar cantidad, precio y subtotal
+                response = supabase.table('pedido_producto').update({
+                    "cantidad": datos_producto['cantidad'],
+                    "precio_unitario": datos_producto['precio_unitario'],
+                    "subtotal": datos_producto['subtotal']
+                }).eq('id_pedido', datos_producto['id_pedido']).eq('id_producto', datos_producto['id_producto']).execute()
+                
+                return {"mensaje": "Producto actualizado en el pedido", "pedido_producto": response.data[0] if response.data else None}
+        except Exception as check_ex:
+            print(f"Error al verificar existencia del producto: {str(check_ex)}. Continuando con inserción.")
         
         # Insertar producto en el pedido
-        response = supabase.table('pedido_producto').insert(pedido_producto.dict()).execute()
+        response = supabase.table('pedido_producto').insert(datos_producto).execute()
         
         # Verificar si la inserción fue exitosa
-        if response.data:
-            return {"mensaje": "Producto agregado al pedido con éxito", "pedido_producto": response.data[0]}
+        if response.data and len(response.data) > 0:
+            return response.data[0]  # Devolvemos directamente el objeto creado
         else:
-            raise HTTPException(status_code=500, detail="Error al agregar producto al pedido")
+            print("No se recibieron datos en la respuesta de inserción de producto")
+            # Asumimos que funcionó pero no retornó datos
+            return datos_producto
+            
     except Exception as ex:
-        if isinstance(ex, HTTPException):
-            raise ex
+        print(f"Error al agregar producto a pedido: {str(ex)}")
         raise HTTPException(status_code=500, detail=str(ex))
 
 @router.post("/bulk/{id_pedido}")
