@@ -10,7 +10,7 @@ class PedidoBase(BaseModel):
     medio_pago_id: int
     id_estado_envio: int
     id_estado: int
-    id_cliente: Optional[int] = None  # Ahora es opcional
+    id_cliente: int
 
 class PedidoCreate(PedidoBase):
     pass
@@ -78,14 +78,8 @@ def crear_pedido(pedido: PedidoCreate):
             "medio_pago_id": pedido.medio_pago_id,
             "id_estado_envio": pedido.id_estado_envio,
             "id_estado": pedido.id_estado,
+            "id_cliente": pedido.id_cliente
         }
-        
-        # Añadir id_cliente solo si está presente
-        if pedido.id_cliente:
-            datos_pedido["id_cliente"] = pedido.id_cliente
-        else:
-            # Si no hay usuario, usamos un cliente "invitado" con ID 0 (asegúrate de que exista en la base de datos)
-            datos_pedido["id_cliente"] = 0
         
         print(f"Intentando insertar pedido con datos simplificados: {datos_pedido}")
         
@@ -119,13 +113,10 @@ def crear_pedido(pedido: PedidoCreate):
             # Tratar de insertar con un enfoque aún más simple
             try:
                 print("Intentando inserción alternativa...")
-                # Determinar el id_cliente para la consulta SQL
-                id_cliente = pedido.id_cliente if pedido.id_cliente else 0
-                
                 # Usar la API directa de supabase para ejecutar SQL
                 simple_query = f"""
                 INSERT INTO pedido (fecha, medio_pago_id, id_estado_envio, id_estado, id_cliente)
-                VALUES ('2024-05-15', {pedido.medio_pago_id}, {pedido.id_estado_envio}, {pedido.id_estado}, {id_cliente})
+                VALUES ('2024-05-15', {pedido.medio_pago_id}, {pedido.id_estado_envio}, {pedido.id_estado}, {pedido.id_cliente})
                 RETURNING *
                 """
                 response = supabase.rpc('ejecutar_sql', {'query': simple_query}).execute()
@@ -138,7 +129,7 @@ def crear_pedido(pedido: PedidoCreate):
                     "medio_pago_id": pedido.medio_pago_id,
                     "id_estado_envio": pedido.id_estado_envio,
                     "id_estado": pedido.id_estado,
-                    "id_cliente": id_cliente
+                    "id_cliente": pedido.id_cliente
                 }
             except Exception as alt_ex:
                 print(f"Error en inserción alternativa: {str(alt_ex)}")
