@@ -226,7 +226,7 @@ def actualizar_estado_pedido(id_pedido: int, id_estado: int):
         raise HTTPException(status_code=500, detail=str(ex))
 
 @router.patch("/{id_pedido}/estado-envio")
-def actualizar_estado_envio(id_pedido: int, id_estado_envio: int):
+def actualizar_estado_envio(id_pedido: int, estado_envio: int = Body(...)):
     try:
         # Obtener conexión a Supabase
         supabase = get_conexion()
@@ -237,7 +237,7 @@ def actualizar_estado_envio(id_pedido: int, id_estado_envio: int):
             raise HTTPException(status_code=404, detail="Pedido no encontrado")
         
         # Actualizar solo el estado de envío del pedido
-        response = supabase.table('pedido').update({"id_estado_envio": id_estado_envio}).eq('id_pedido', id_pedido).execute()
+        response = supabase.table('pedido').update({"id_estado_envio": estado_envio}).eq('id_pedido', id_pedido).execute()
         
         return {"mensaje": "Estado de envío actualizado con éxito", "pedido": response.data[0]}
     except Exception as ex:
