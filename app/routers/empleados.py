@@ -19,6 +19,17 @@ class EmpleadoCreate(BaseModel):
     telefono: str
     rol_id: int
 
+# Función auxiliar para formatear RUT
+def format_rut(rut: str) -> str:
+    # Eliminar espacios y caracteres no deseados
+    rut = rut.strip().replace(" ", "").replace(".", "")
+    
+    # Asegurar que tiene un guión
+    if "-" not in rut and len(rut) >= 2:
+        rut = rut[:-1] + "-" + rut[-1]
+    
+    return rut
+
 router = APIRouter(
     prefix="/empleados",
     tags=["Empleados"]
@@ -65,14 +76,21 @@ def obtener_empleado(id_empleado: int):
 @router.post("/")
 def agregar_empleado(empleado: EmpleadoCreate):
     try:
-        # Obtener conexión a Supabase
+        # Formatear RUT
+        rut_formateado = format_rut(empleado.rut)
+        
+        # Comprobar si el RUT ya existe
         supabase = get_conexion()
         
-        # Insertar nuevo empleado
+        check_rut = supabase.table('empleado').select('id_empleado').eq('rut', rut_formateado).execute()
+        if check_rut.data and len(check_rut.data) > 0:
+            raise HTTPException(status_code=409, detail=f"Ya existe un empleado con el RUT: {rut_formateado}")
+        
+        # Insertar nuevo empleado con RUT formateado
         response = supabase.table('empleado').insert({
             "nombre": empleado.nombre,
             "apellido": empleado.apellido,
-            "rut": empleado.rut,
+            "rut": rut_formateado,
             "correo": empleado.correo,
             "contrasena": empleado.contrasena,
             "direccion": empleado.direccion,
@@ -86,7 +104,9 @@ def agregar_empleado(empleado: EmpleadoCreate):
         else:
             raise HTTPException(status_code=500, detail="Error al agregar empleado")
     except Exception as ex:
-        raise HTTPException(status_code=500, detail=str(ex))
+        if isinstance(ex, HTTPException):
+            raise ex
+        raise HTTPException(status_code=500, detail=f"Error al crear empleado: {str(ex)}")
 
 @router.put("/{id_empleado}")
 def actualizar_empleado(
