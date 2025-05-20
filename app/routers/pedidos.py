@@ -34,8 +34,8 @@ def obtener_pedidos():
         # Obtener conexión a Supabase
         supabase = get_conexion()
         
-        # Consultar todos los pedidos de la tabla 'pedido'
-        response = supabase.table('pedido').select('*').execute()
+        # Consultar todos los pedidos de la tabla 'pedido' con join a la tabla cliente
+        response = supabase.table('pedido').select('*, cliente(*)').execute()
         
         # Verificar si la respuesta contiene datos
         if not response.data:
