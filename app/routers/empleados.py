@@ -1,52 +1,23 @@
-from fastapi import APIRouter, HTTPException, Body, Form
+from fastapi import APIRouter, HTTPException, Body
 from app.database import get_conexion
 from typing import Optional, Dict
-from pydantic import BaseModel, EmailStr, constr, validator
+from pydantic import BaseModel
 
 # Modelo para la petición de login
 class LoginRequest(BaseModel):
     correo: str
     contrasena: str
 
-# Modelo para actualización de empleado
-class EmpleadoUpdate(BaseModel):
-    nombre: Optional[str] = None
-    apellido: Optional[str] = None
-    correo: Optional[str] = None
-    telefono: Optional[str] = None
-    direccion: Optional[str] = None
-    rol_id: Optional[int] = None
-    rut: Optional[str] = None
-    contrasena: Optional[str] = None
-
 # Modelo para crear empleado
 class EmpleadoCreate(BaseModel):
-    nombre: constr(min_length=2, max_length=50)
-    apellido: constr(min_length=2, max_length=50)
-    rut: constr(regex=r'^\d{7,8}-[\dkK]$')
-    correo: EmailStr
-    contrasena: constr(min_length=6)
-    direccion: Optional[str] = "N/A"
-    telefono: Optional[str] = "N/A"
+    nombre: str
+    apellido: str
+    rut: str
+    correo: str
+    contrasena: str
+    direccion: str
+    telefono: str
     rol_id: int
-
-    @validator('rol_id')
-    def validar_rol(cls, v):
-        if v not in [2, 3, 4, 5]:
-            raise ValueError('Rol inválido. Debe ser 2 (Admin), 3 (Vendedor), 4 (Bodeguero) o 5 (Contador)')
-        return v
-
-    @validator('nombre', 'apellido')
-    def validar_nombre_apellido(cls, v):
-        if not v.strip():
-            raise ValueError('No puede estar vacío')
-        return v.strip()
-
-    @validator('direccion', 'telefono')
-    def validar_campos_opcionales(cls, v):
-        if not v or not v.strip():
-            return "N/A"
-        return v.strip()
 
 router = APIRouter(
     prefix="/empleados",
@@ -92,72 +63,46 @@ def obtener_empleado(id_empleado: int):
         raise HTTPException(status_code=500, detail=str(ex))
 
 @router.post("/")
-async def agregar_empleado(
-    nombre: str = Form(...),
-    apellido: str = Form(...),
-    correo: str = Form(...),
-    telefono: str = Form(...),
-    direccion: str = Form(...),
-    rol_id: int = Form(...),
-    rut: str = Form(...),
-    contrasena: str = Form(...)
-):
+def agregar_empleado(empleado: EmpleadoCreate):
     try:
-        # Validaciones adicionales
-        if not nombre or not apellido or not correo or not rut or not contrasena:
-            raise HTTPException(status_code=422, detail="Todos los campos marcados son obligatorios")
-
-        if rol_id not in [2, 3, 4, 5]:
-            raise HTTPException(status_code=422, detail="Rol inválido. Debe ser 2 (Admin), 3 (Vendedor), 4 (Bodeguero) o 5 (Contador)")
-
         # Obtener conexión a Supabase
         supabase = get_conexion()
         
-        # Verificar si ya existe un empleado con el mismo correo
-        check_email = supabase.table('empleado').select('*').eq('correo', correo).execute()
-        if check_email.data and len(check_email.data) > 0:
-            raise HTTPException(status_code=400, detail="Ya existe un empleado con este correo")
-
-        # Verificar si ya existe un empleado con el mismo RUT
-        check_rut = supabase.table('empleado').select('*').eq('rut', rut).execute()
-        if check_rut.data and len(check_rut.data) > 0:
-            raise HTTPException(status_code=400, detail="Ya existe un empleado con este RUT")
-
-        # Preparar los datos para insertar
-        datos_empleado = {
-            "nombre": nombre.strip(),
-            "apellido": apellido.strip(),
-            "correo": correo.strip(),
-            "telefono": telefono.strip() if telefono else "N/A",
-            "direccion": direccion.strip() if direccion else "N/A",
-            "rol_id": rol_id,
-            "rut": rut.strip(),
-            "contrasena": contrasena
-        }
-        
         # Insertar nuevo empleado
-        response = supabase.table('empleado').insert(datos_empleado).execute()
+        response = supabase.table('empleado').insert({
+            "nombre": empleado.nombre,
+            "apellido": empleado.apellido,
+            "rut": empleado.rut,
+            "correo": empleado.correo,
+            "contrasena": empleado.contrasena,
+            "direccion": empleado.direccion,
+            "telefono": empleado.telefono,
+            "rol_id": empleado.rol_id
+        }).execute()
         
         # Verificar si la inserción fue exitosa
-        if response.data and len(response.data) > 0:
-            empleado_creado = response.data[0]
-            return {"mensaje": "Empleado agregado con éxito", "empleado": empleado_creado}
+        if response.data:
+            return {"mensaje": "Empleado agregado con éxito", "empleado": response.data[0]}
         else:
-            raise HTTPException(status_code=500, detail="Error al agregar empleado: No se recibieron datos de la base de datos")
-    except HTTPException as http_ex:
-        raise http_ex
+            raise HTTPException(status_code=500, detail="Error al agregar empleado")
     except Exception as ex:
-        raise HTTPException(status_code=500, detail=f"Error al agregar empleado: {str(ex)}")
+        raise HTTPException(status_code=500, detail=str(ex))
 
 @router.put("/{id_empleado}")
 def actualizar_empleado(
     id_empleado: int,
-    empleado: EmpleadoUpdate
+    nombre: Optional[str] = None,
+    apellido: Optional[str] = None,
+    rut: Optional[str] = None,
+    correo: Optional[str] = None,
+    contrasena: Optional[str] = None,
+    direccion: Optional[str] = None,
+    telefono: Optional[str] = None,
+    rol_id: Optional[int] = None
 ):
     try:
         # Verificar que al menos un campo sea proporcionado
-        datos_actualizar = {k: v for k, v in empleado.dict().items() if v is not None}
-        if not datos_actualizar:
+        if not any([nombre, apellido, rut, correo, contrasena, direccion, telefono, rol_id]):
             raise HTTPException(status_code=400, detail="Debe proporcionar al menos un campo para actualizar")
         
         # Obtener conexión a Supabase
@@ -167,6 +112,25 @@ def actualizar_empleado(
         check_response = supabase.table('empleado').select('id_empleado').eq('id_empleado', id_empleado).execute()
         if not check_response.data or len(check_response.data) == 0:
             raise HTTPException(status_code=404, detail="Empleado no encontrado")
+        
+        # Crear diccionario con campos a actualizar
+        datos_actualizar = {}
+        if nombre is not None:
+            datos_actualizar["nombre"] = nombre
+        if apellido is not None:
+            datos_actualizar["apellido"] = apellido
+        if rut is not None:
+            datos_actualizar["rut"] = rut
+        if correo is not None:
+            datos_actualizar["correo"] = correo
+        if contrasena is not None:
+            datos_actualizar["contrasena"] = contrasena
+        if direccion is not None:
+            datos_actualizar["direccion"] = direccion
+        if telefono is not None:
+            datos_actualizar["telefono"] = telefono
+        if rol_id is not None:
+            datos_actualizar["rol_id"] = rol_id
         
         # Actualizar empleado
         response = supabase.table('empleado').update(datos_actualizar).eq('id_empleado', id_empleado).execute()
