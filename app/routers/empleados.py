@@ -8,6 +8,17 @@ class LoginRequest(BaseModel):
     correo: str
     contrasena: str
 
+# Modelo para crear empleado
+class EmpleadoCreate(BaseModel):
+    nombre: str
+    apellido: str
+    rut: str
+    correo: str
+    contrasena: str
+    direccion: str
+    telefono: str
+    rol_id: int
+
 router = APIRouter(
     prefix="/empleados",
     tags=["Empleados"]
@@ -52,30 +63,21 @@ def obtener_empleado(id_empleado: int):
         raise HTTPException(status_code=500, detail=str(ex))
 
 @router.post("/")
-def agregar_empleado(
-    nombre: str, 
-    apellido: str, 
-    rut: str, 
-    correo: str, 
-    contrasena: str, 
-    direccion: str, 
-    telefono: str, 
-    rol_id: int
-):
+def agregar_empleado(empleado: EmpleadoCreate):
     try:
         # Obtener conexión a Supabase
         supabase = get_conexion()
         
         # Insertar nuevo empleado
         response = supabase.table('empleado').insert({
-            "nombre": nombre,
-            "apellido": apellido,
-            "rut": rut,
-            "correo": correo,
-            "contrasena": contrasena,
-            "direccion": direccion,
-            "telefono": telefono,
-            "rol_id": rol_id
+            "nombre": empleado.nombre,
+            "apellido": empleado.apellido,
+            "rut": empleado.rut,
+            "correo": empleado.correo,
+            "contrasena": empleado.contrasena,
+            "direccion": empleado.direccion,
+            "telefono": empleado.telefono,
+            "rol_id": empleado.rol_id
         }).execute()
         
         # Verificar si la inserción fue exitosa
