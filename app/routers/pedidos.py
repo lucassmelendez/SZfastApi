@@ -96,7 +96,44 @@ def crear_pedido(pedido: PedidoCreate):
             
             # Verificar si la inserción fue exitosa
             if response.data and len(response.data) > 0:
-                return response.data[0]  # Devolver directamente el objeto creado
+                # Si es un pago por transferencia (medio_pago_id == 1), decrementar el stock de los productos
+                pedido_creado = response.data[0]
+                
+                # Solo si es transferencia (medio_pago_id == 1) actualizamos el stock inmediatamente
+                # Para WebPay (medio_pago_id == 2) el stock se actualiza cuando se confirma la transacción
+                if pedido.medio_pago_id == 1:  # 1 es transferencia
+                    try:
+                        # Obtenemos los productos asociados al pedido
+                        detalles_response = supabase.table('pedido_producto').select('*').eq('id_pedido', pedido_creado['id_pedido']).execute()
+                        
+                        if detalles_response.data and len(detalles_response.data) > 0:
+                            print(f"Actualizando stock para {len(detalles_response.data)} productos")
+                            
+                            # Para cada producto en el pedido, actualizar su stock
+                            for detalle in detalles_response.data:
+                                try:
+                                    # Obtener el stock actual del producto
+                                    producto_response = supabase.table('producto').select('stock').eq('id_producto', detalle['id_producto']).execute()
+                                    
+                                    if producto_response.data and len(producto_response.data) > 0:
+                                        producto = producto_response.data[0]
+                                        
+                                        # Calcular nuevo stock
+                                        nuevo_stock = max(0, producto['stock'] - detalle['cantidad'])
+                                        
+                                        # Actualizar stock en la tabla producto
+                                        update_response = supabase.table('producto').update({'stock': nuevo_stock}).eq('id_producto', detalle['id_producto']).execute()
+                                        
+                                        if update_response.error:
+                                            print(f"Error al actualizar stock del producto {detalle['id_producto']}: {update_response.error}")
+                                        else:
+                                            print(f"Stock actualizado para producto {detalle['id_producto']}: {producto['stock']} -> {nuevo_stock}")
+                                except Exception as prod_ex:
+                                    print(f"Error al actualizar stock del producto {detalle['id_producto']}: {str(prod_ex)}")
+                    except Exception as stock_ex:
+                        print(f"Error al actualizar stock de productos: {str(stock_ex)}")
+                
+                return pedido_creado  # Devolver directamente el objeto creado
             else:
                 print("No se recibieron datos en la respuesta de inserción")
                 # Si no hay datos pero no hubo error, devolver un objeto básico con id_pedido

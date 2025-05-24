@@ -116,6 +116,34 @@ def agregar_producto_a_pedido(pedido_producto: PedidoProductoCreate):
         
         # Verificar si la inserción fue exitosa
         if response.data and len(response.data) > 0:
+            # Verificar el tipo de pago del pedido
+            try:
+                pedido_response = supabase.table('pedido').select('medio_pago_id').eq('id_pedido', datos_producto['id_pedido']).execute()
+                
+                # Si el pedido existe y es por transferencia (medio_pago_id = 1), actualizar el stock
+                if pedido_response.data and len(pedido_response.data) > 0 and pedido_response.data[0]['medio_pago_id'] == 1:
+                    try:
+                        # Obtener el stock actual del producto
+                        producto_response = supabase.table('producto').select('stock').eq('id_producto', datos_producto['id_producto']).execute()
+                        
+                        if producto_response.data and len(producto_response.data) > 0:
+                            producto = producto_response.data[0]
+                            
+                            # Calcular nuevo stock
+                            nuevo_stock = max(0, producto['stock'] - datos_producto['cantidad'])
+                            
+                            # Actualizar stock en la tabla producto
+                            update_response = supabase.table('producto').update({'stock': nuevo_stock}).eq('id_producto', datos_producto['id_producto']).execute()
+                            
+                            if update_response.error:
+                                print(f"Error al actualizar stock del producto {datos_producto['id_producto']}: {update_response.error}")
+                            else:
+                                print(f"Stock actualizado para producto {datos_producto['id_producto']}: {producto['stock']} -> {nuevo_stock}")
+                    except Exception as stock_ex:
+                        print(f"Error al actualizar stock del producto: {str(stock_ex)}")
+            except Exception as pedido_ex:
+                print(f"Error al verificar el tipo de pago del pedido: {str(pedido_ex)}")
+            
             return response.data[0]  # Devolvemos directamente el objeto creado
         else:
             print("No se recibieron datos en la respuesta de inserción de producto")
@@ -134,12 +162,17 @@ def agregar_multiples_productos(id_pedido: int, productos: ProductosEnPedido):
         
         # Verificar si el pedido existe
         try:
-            check_pedido = supabase.table('pedido').select('id_pedido').eq('id_pedido', id_pedido).execute()
+            check_pedido = supabase.table('pedido').select('id_pedido, medio_pago_id').eq('id_pedido', id_pedido).execute()
             if not check_pedido.data or len(check_pedido.data) == 0:
                 raise HTTPException(status_code=404, detail="Pedido no encontrado")
+            
+            # Obtener el método de pago para determinar si hay que actualizar el stock
+            pedido = check_pedido.data[0]
+            es_transferencia = pedido['medio_pago_id'] == 1  # 1 es transferencia
         except Exception as ex:
             print(f"Error al verificar existencia del pedido: {str(ex)}")
             # Continuamos el proceso aunque haya errores en la verificación
+            es_transferencia = False
         
         # Preparar lista de productos para insertar
         productos_a_insertar = []
@@ -173,6 +206,30 @@ def agregar_multiples_productos(id_pedido: int, productos: ProductosEnPedido):
             
             # Verificar si la inserción fue exitosa
             if response.data:
+                # Si es un pedido por transferencia, actualizar el stock de los productos
+                if es_transferencia:
+                    print(f"Actualizando stock para {len(productos_a_insertar)} productos (pago por transferencia)")
+                    for producto in productos_a_insertar:
+                        try:
+                            # Obtener el stock actual del producto
+                            producto_response = supabase.table('producto').select('stock').eq('id_producto', producto['id_producto']).execute()
+                            
+                            if producto_response.data and len(producto_response.data) > 0:
+                                stock_actual = producto_response.data[0]['stock']
+                                
+                                # Calcular nuevo stock
+                                nuevo_stock = max(0, stock_actual - producto['cantidad'])
+                                
+                                # Actualizar stock en la tabla producto
+                                update_response = supabase.table('producto').update({'stock': nuevo_stock}).eq('id_producto', producto['id_producto']).execute()
+                                
+                                if update_response.error:
+                                    print(f"Error al actualizar stock del producto {producto['id_producto']}: {update_response.error}")
+                                else:
+                                    print(f"Stock actualizado para producto {producto['id_producto']}: {stock_actual} -> {nuevo_stock}")
+                        except Exception as stock_ex:
+                            print(f"Error al actualizar stock del producto {producto['id_producto']}: {str(stock_ex)}")
+                
                 return {"mensaje": f"Se agregaron {len(response.data)} productos al pedido con éxito", "productos": response.data}
             else:
                 print("No se obtuvieron datos en la respuesta de inserción de productos")
