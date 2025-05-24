@@ -74,7 +74,7 @@ def crear_pedido(pedido: PedidoCreate):
         # Preparar los datos del pedido con exactamente los mismos nombres de campo
         # y usando un formato de fecha específico
         datos_pedido = {
-            "fecha": "2024-05-15",  # Usar una fecha estática conocida para evitar problemas de formato
+            "fecha": datetime.now().strftime('%Y-%m-%d'),  # Usar la fecha actual
             "medio_pago_id": pedido.medio_pago_id,
             "id_estado_envio": pedido.id_estado_envio,
             "id_estado": pedido.id_estado,
@@ -151,9 +151,10 @@ def crear_pedido(pedido: PedidoCreate):
             try:
                 print("Intentando inserción alternativa...")
                 # Usar la API directa de supabase para ejecutar SQL
+                current_date = datetime.now().strftime('%Y-%m-%d')
                 simple_query = f"""
                 INSERT INTO pedido (fecha, medio_pago_id, id_estado_envio, id_estado, id_cliente)
-                VALUES ('2024-05-15', {pedido.medio_pago_id}, {pedido.id_estado_envio}, {pedido.id_estado}, {pedido.id_cliente})
+                VALUES ('{current_date}', {pedido.medio_pago_id}, {pedido.id_estado_envio}, {pedido.id_estado}, {pedido.id_cliente})
                 RETURNING *
                 """
                 response = supabase.rpc('ejecutar_sql', {'query': simple_query}).execute()
@@ -162,7 +163,7 @@ def crear_pedido(pedido: PedidoCreate):
                 # Si esto también falla, devolver un objeto simulado
                 return {
                     "id_pedido": 1,
-                    "fecha": "2024-05-15",
+                    "fecha": datetime.now().strftime('%Y-%m-%d'),
                     "medio_pago_id": pedido.medio_pago_id,
                     "id_estado_envio": pedido.id_estado_envio,
                     "id_estado": pedido.id_estado,
