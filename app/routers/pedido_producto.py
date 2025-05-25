@@ -308,4 +308,62 @@ def obtener_detalle_pedido_producto(id_pedido_producto: int):
     except Exception as ex:
         if isinstance(ex, HTTPException):
             raise ex
-        raise HTTPException(status_code=500, detail=str(ex)) 
+        raise HTTPException(status_code=500, detail=str(ex))
+
+@router.get("/productos/mas-vendidos")
+def obtener_productos_mas_vendidos(limit: Optional[int] = 15):
+    try:
+        # Obtener conexión a Supabase
+        supabase = get_conexion()
+        
+        # Realizar una consulta para obtener la cantidad total vendida por cada producto
+        # Primero obtenemos todos los registros de pedido_producto
+        pedido_productos = supabase.table('pedido_producto').select('id_producto, cantidad').execute()
+        
+        if not pedido_productos.data:
+            return []
+        
+        # Agrupar por producto y sumar cantidades
+        ventas_por_producto = {}
+        for item in pedido_productos.data:
+            id_producto = item['id_producto']
+            cantidad = item['cantidad']
+            
+            if id_producto in ventas_por_producto:
+                ventas_por_producto[id_producto] += cantidad
+            else:
+                ventas_por_producto[id_producto] = cantidad
+        
+        # Ordenar productos por cantidad vendida (de mayor a menor)
+        productos_ordenados = sorted(
+            ventas_por_producto.items(), 
+            key=lambda x: x[1], 
+            reverse=True
+        )
+        
+        # Limitar la cantidad de resultados si se especifica
+        if limit > 0:
+            productos_ordenados = productos_ordenados[:limit]
+        
+        # Obtener detalles de los productos
+        ids_productos = [producto[0] for producto in productos_ordenados]
+        
+        # Si no hay productos vendidos, devolver lista vacía
+        if not ids_productos:
+            return []
+        
+        # Obtener información completa de los productos
+        productos = []
+        for id_producto, total_vendido in productos_ordenados:
+            producto_info = supabase.table('producto').select('*').eq('id_producto', id_producto).execute()
+            
+            if producto_info.data and len(producto_info.data) > 0:
+                producto = producto_info.data[0]
+                producto['total_vendido'] = total_vendido
+                productos.append(producto)
+        
+        return productos
+    except Exception as ex:
+        if isinstance(ex, HTTPException):
+            raise ex
+        raise HTTPException(status_code=500, detail=f"Error al obtener productos más vendidos: {str(ex)}") 
