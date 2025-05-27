@@ -8,10 +8,8 @@ def iniciar_app():
     """
     print("Iniciando la API con FastAPI y Supabase...")
     
-    # Obtener la ruta raíz del proyecto (subiendo dos niveles desde este script)
     ruta_raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
-    # Verificar que el archivo .env existe
     ruta_env = os.path.join(ruta_raiz, '.env')
     if not os.path.exists(ruta_env):
         print("ADVERTENCIA: No se encontró el archivo .env")
@@ -23,11 +21,9 @@ def iniciar_app():
         if respuesta.lower() != 's':
             sys.exit(1)
     
-    # Determinar el host y puerto
     host = '127.0.0.1'
     puerto = 8000
     
-    # Construir el comando para iniciar la aplicación
     comando = [
         'uvicorn',
         'app.main:app',
@@ -36,7 +32,6 @@ def iniciar_app():
         '--reload'
     ]
     
-    # Iniciar el servidor
     print(f"La API estará disponible en http://{host}:{puerto}")
     print("Swagger UI: http://127.0.0.1:8000/docs")
     print("ReDoc: http://127.0.0.1:8000/redoc")

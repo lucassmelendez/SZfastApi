@@ -8,7 +8,6 @@ app = FastAPI(
     description="API para gestionar clientes y empleados usando FastAPI y Supabase"
 )
 
-# Configurar CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "https://sz-frontend.vercel.app", "*"],
@@ -17,7 +16,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Incluir rutas
 app.include_router(clientes.router)
 app.include_router(empleados.router)
 app.include_router(pedidos.router)

@@ -2,16 +2,11 @@ import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from functools import lru_cache
-
-# Cargar variables de entorno (solo una vez al importar el módulo)
 load_dotenv()
 
-# Configuración de Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-# Usar caché para evitar crear múltiples conexiones en un breve período
-# Esto ayuda a optimizar el rendimiento en entornos sin servidor como Vercel
 @lru_cache(maxsize=10)
 def get_conexion() -> Client:
     """

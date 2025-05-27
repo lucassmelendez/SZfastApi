@@ -3,12 +3,10 @@ from app.database import get_conexion
 from typing import Optional, Dict
 from pydantic import BaseModel
 
-# Modelo para la petición de login
 class LoginRequest(BaseModel):
     correo: str
     contrasena: str
 
-# Modelo para crear empleado
 class EmpleadoCreate(BaseModel):
     nombre: str
     apellido: str
@@ -19,12 +17,9 @@ class EmpleadoCreate(BaseModel):
     telefono: str
     rol_id: int
 
-# Función auxiliar para formatear RUT
 def format_rut(rut: str) -> str:
-    # Eliminar espacios y caracteres no deseados
     rut = rut.strip().replace(" ", "").replace(".", "")
     
-    # Asegurar que tiene un guión
     if "-" not in rut and len(rut) >= 2:
         rut = rut[:-1] + "-" + rut[-1]
     
@@ -35,17 +30,13 @@ router = APIRouter(
     tags=["Empleados"]
 )
 
-# Endpoints: GET, GET, POST, PUT, DELETE, PATCH
 @router.get("/")
 def obtener_empleados():
     try:
-        # Obtener conexión a Supabase
         supabase = get_conexion()
         
-        # Consultar todos los empleados de la tabla 'empleado'
         response = supabase.table('empleado').select('*').execute()
         
-        # Verificar si la respuesta contiene datos
         if not response.data:
             return []
         
@@ -56,17 +47,13 @@ def obtener_empleados():
 @router.get("/{id_empleado}")
 def obtener_empleado(id_empleado: int):
     try:
-        # Obtener conexión a Supabase
         supabase = get_conexion()
         
-        # Consultar empleado por id
         response = supabase.table('empleado').select('*').eq('id_empleado', id_empleado).execute()
         
-        # Verificar si se encontró el empleado
         if not response.data or len(response.data) == 0:
             raise HTTPException(status_code=404, detail="Empleado no encontrado")
         
-        # Obtener el primer empleado (debería ser único por id)
         return response.data[0]
     except Exception as ex:
         if isinstance(ex, HTTPException):
@@ -76,17 +63,14 @@ def obtener_empleado(id_empleado: int):
 @router.post("/")
 def agregar_empleado(empleado: EmpleadoCreate):
     try:
-        # Formatear RUT
         rut_formateado = format_rut(empleado.rut)
         
-        # Comprobar si el RUT ya existe
         supabase = get_conexion()
         
         check_rut = supabase.table('empleado').select('id_empleado').eq('rut', rut_formateado).execute()
         if check_rut.data and len(check_rut.data) > 0:
             raise HTTPException(status_code=409, detail=f"Ya existe un empleado con el RUT: {rut_formateado}")
         
-        # Insertar nuevo empleado con RUT formateado
         response = supabase.table('empleado').insert({
             "nombre": empleado.nombre,
             "apellido": empleado.apellido,
@@ -98,7 +82,6 @@ def agregar_empleado(empleado: EmpleadoCreate):
             "rol_id": empleado.rol_id
         }).execute()
         
-        # Verificar si la inserción fue exitosa
         if response.data:
             return {"mensaje": "Empleado agregado con éxito", "empleado": response.data[0]}
         else:
@@ -121,19 +104,15 @@ def actualizar_empleado(
     rol_id: Optional[int] = None
 ):
     try:
-        # Verificar que al menos un campo sea proporcionado
         if not any([nombre, apellido, rut, correo, contrasena, direccion, telefono, rol_id]):
             raise HTTPException(status_code=400, detail="Debe proporcionar al menos un campo para actualizar")
         
-        # Obtener conexión a Supabase
         supabase = get_conexion()
         
-        # Verificar si el empleado existe
         check_response = supabase.table('empleado').select('id_empleado').eq('id_empleado', id_empleado).execute()
         if not check_response.data or len(check_response.data) == 0:
             raise HTTPException(status_code=404, detail="Empleado no encontrado")
         
-        # Crear diccionario con campos a actualizar
         datos_actualizar = {}
         if nombre is not None:
             datos_actualizar["nombre"] = nombre
@@ -152,7 +131,6 @@ def actualizar_empleado(
         if rol_id is not None:
             datos_actualizar["rol_id"] = rol_id
         
-        # Actualizar empleado
         response = supabase.table('empleado').update(datos_actualizar).eq('id_empleado', id_empleado).execute()
         
         return {"mensaje": "Empleado actualizado con éxito", "empleado": response.data[0]}
@@ -164,15 +142,12 @@ def actualizar_empleado(
 @router.delete("/{id_empleado}")
 def eliminar_empleado(id_empleado: int):
     try:
-        # Obtener conexión a Supabase
         supabase = get_conexion()
         
-        # Verificar si el empleado existe
         check_response = supabase.table('empleado').select('id_empleado').eq('id_empleado', id_empleado).execute()
         if not check_response.data or len(check_response.data) == 0:
             raise HTTPException(status_code=404, detail="Empleado no encontrado")
         
-        # Eliminar empleado
         response = supabase.table('empleado').delete().eq('id_empleado', id_empleado).execute()
         
         return {"mensaje": "Empleado eliminado con éxito"}
@@ -184,17 +159,13 @@ def eliminar_empleado(id_empleado: int):
 @router.get("/rut/{rut}")
 def obtener_empleado_por_rut(rut: str):
     try:
-        # Obtener conexión a Supabase
         supabase = get_conexion()
         
-        # Consultar empleado por rut
         response = supabase.table('empleado').select('*').eq('rut', rut).execute()
         
-        # Verificar si se encontró el empleado
         if not response.data or len(response.data) == 0:
             raise HTTPException(status_code=404, detail="Empleado no encontrado")
         
-        # Obtener el primer empleado con ese rut
         return response.data[0]
     except Exception as ex:
         if isinstance(ex, HTTPException):
@@ -204,24 +175,18 @@ def obtener_empleado_por_rut(rut: str):
 @router.post("/login", status_code=200)
 def login_empleado(login_data: LoginRequest):
     try:
-        # Obtener conexión a Supabase
         supabase = get_conexion()
         
-        # Buscar empleado por correo y contraseña
         response = supabase.table('empleado').select('*').eq('correo', login_data.correo).execute()
         
-        # Verificar si se encontró el empleado
         if not response.data or len(response.data) == 0:
             raise HTTPException(status_code=404, detail="Empleado no encontrado")
         
-        # Obtener el empleado
         empleado = response.data[0]
         
-        # Verificar contraseña
         if empleado['contrasena'] != login_data.contrasena:
             raise HTTPException(status_code=401, detail="Contraseña incorrecta")
         
-        # Eliminar contraseña del objeto de respuesta por seguridad
         del empleado['contrasena']
         
         return {"mensaje": "Inicio de sesión exitoso", "empleado": empleado}

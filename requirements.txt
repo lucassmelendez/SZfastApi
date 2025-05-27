@@ -1,6 +1,6 @@
 fastapi>=0.115.0
 uvicorn>=0.26.0
 supabase>=2.15.0
-python-dotenv>=1.0.0  # Solo necesario si vas a migrar datos desde Oracle
+python-dotenv>=1.0.0
 pydantic>=2.0.0
 starlette>=0.35.0 
