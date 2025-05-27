@@ -114,8 +114,20 @@ El sistema utiliza las siguientes tablas principales:
 - `telefono`: Número de teléfono
 - `rol_id`: Referencia a la tabla rol (FK)
 
-### Tabla `pedido` y `pedido_producto`
-Revisa el script SQL para detalles sobre las tablas de pedidos y productos.
+### Tabla `pedido`
+- `id_pedido`: ID único del pedido (PK)
+- `fecha_pedido`: Fecha de creación del pedido
+- `estado`: Estado actual del pedido
+- `total`: Monto total del pedido
+- `id_cliente`: Referencia al cliente que realizó el pedido (FK)
+
+### Tabla `pedido_producto`
+- `id_pedido_producto`: ID único de la relación pedido-producto (PK)
+- `id_pedido`: Referencia al pedido (FK)
+- `id_producto`: Referencia al producto (FK)
+- `cantidad`: Cantidad del producto en el pedido
+- `precio_unitario`: Precio unitario del producto al momento de la compra
+- `subtotal`: Subtotal (cantidad * precio_unitario)
 
 ## ▶️ Ejecución
 
