@@ -458,7 +458,7 @@ def obtener_productos_mas_vendidos(limit: Optional[int] = 15):
         raise HTTPException(status_code=500, detail=f"Error al obtener productos más vendidos: {str(ex)}")
 
 @router.post("/pedido/{id_pedido}/recalcular-descuentos")
-async def recalcular_descuentos_pedido(id_pedido: int):
+def recalcular_descuentos_pedido(id_pedido: int):
     try:
         supabase = get_conexion()
         
