@@ -1,6 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import clientes, empleados, pedidos, pedido_producto
+from app.logging_config import configure_logging
+
+# Configurar el logging al inicio de la aplicación
+configure_logging()
 
 app = FastAPI(
     title="API de gestión de SpinZone",
