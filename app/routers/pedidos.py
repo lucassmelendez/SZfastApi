@@ -36,7 +36,36 @@ def obtener_pedidos():
         if not response.data:
             return []
         
-        return response.data
+        # Para cada pedido, obtener sus productos con descuentos
+        pedidos = []
+        for pedido in response.data:
+            # Obtener los productos del pedido
+            productos_response = supabase.table('pedido_producto').select('*').eq('id_pedido', pedido['id_pedido']).execute()
+            
+            if productos_response.data:
+                # Calcular si aplica descuento basado en la cantidad total
+                total_cantidad = sum(item['cantidad'] for item in productos_response.data)
+                aplicar_descuento = total_cantidad > 4
+                
+                # Actualizar los descuentos y subtotales si es necesario
+                for producto in productos_response.data:
+                    subtotal_original = producto['cantidad'] * producto['precio_unitario']
+                    if aplicar_descuento and producto['descuento'] == 0:
+                        producto['descuento'] = int(subtotal_original * 0.05)
+                        producto['subtotal'] = subtotal_original - producto['descuento']
+                        # Actualizar en la base de datos
+                        supabase.table('pedido_producto').update({
+                            'descuento': producto['descuento'],
+                            'subtotal': producto['subtotal']
+                        }).eq('id_pedido', pedido['id_pedido']).eq('id_producto', producto['id_producto']).execute()
+                
+                pedido['productos'] = productos_response.data
+                pedido['total_productos'] = total_cantidad
+                pedido['aplicar_descuento'] = aplicar_descuento
+            
+            pedidos.append(pedido)
+        
+        return pedidos
     except Exception as ex:
         raise HTTPException(status_code=500, detail=str(ex))
 
@@ -45,12 +74,39 @@ def obtener_pedido(id_pedido: int):
     try:
         supabase = get_conexion()
         
+        # Obtener el pedido principal
         response = supabase.table('pedido').select('*').eq('id_pedido', id_pedido).execute()
         
         if not response.data or len(response.data) == 0:
             raise HTTPException(status_code=404, detail="Pedido no encontrado")
+            
+        pedido = response.data[0]
         
-        return response.data[0]
+        # Obtener los productos del pedido
+        productos_response = supabase.table('pedido_producto').select('*').eq('id_pedido', id_pedido).execute()
+        
+        if productos_response.data:
+            # Calcular si aplica descuento basado en la cantidad total
+            total_cantidad = sum(item['cantidad'] for item in productos_response.data)
+            aplicar_descuento = total_cantidad > 4
+            
+            # Actualizar los descuentos y subtotales si es necesario
+            for producto in productos_response.data:
+                subtotal_original = producto['cantidad'] * producto['precio_unitario']
+                if aplicar_descuento:
+                    producto['descuento'] = int(subtotal_original * 0.05)
+                    producto['subtotal'] = subtotal_original - producto['descuento']
+                    # Actualizar en la base de datos
+                    supabase.table('pedido_producto').update({
+                        'descuento': producto['descuento'],
+                        'subtotal': producto['subtotal']
+                    }).eq('id_pedido', id_pedido).eq('id_producto', producto['id_producto']).execute()
+            
+            pedido['productos'] = productos_response.data
+            pedido['total_productos'] = total_cantidad
+            pedido['aplicar_descuento'] = aplicar_descuento
+            
+        return pedido
     except Exception as ex:
         if isinstance(ex, HTTPException):
             raise ex
