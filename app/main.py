@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import clientes, empleados, pedidos
-from app.routers.pedido_producto_new import router as pedido_producto_router
+from app.routers.pedido_producto import router as pedido_producto_router
 
 app = FastAPI(
     title="API de gestión de SpinZone",

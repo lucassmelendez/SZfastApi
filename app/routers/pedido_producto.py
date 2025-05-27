@@ -1,7 +1,23 @@
 from fastapi import APIRouter, HTTPException
 from app.database import get_conexion
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from pydantic import BaseModel
+
+def calcular_descuento_producto(cantidad: int, precio_unitario: int, aplicar_descuento: bool = False) -> Tuple[int, int]:
+    """Calcula el descuento y subtotal para un producto.
+    
+    Args:
+        cantidad: Cantidad del producto
+        precio_unitario: Precio por unidad
+        aplicar_descuento: Si se debe aplicar el descuento del 5%
+        
+    Returns:
+        tuple[int, int]: (subtotal_final, descuento)
+    """
+    subtotal_original = cantidad * precio_unitario
+    descuento = int(subtotal_original * 0.05) if aplicar_descuento else 0
+    subtotal_final = subtotal_original - descuento
+    return (subtotal_final, descuento)
 
 class PedidoProductoBase(BaseModel):
     cantidad: int
@@ -65,20 +81,24 @@ def obtener_productos_por_pedido(id_pedido: int):
             subtotal_original = producto['cantidad'] * producto['precio_unitario']
             total_original += subtotal_original
             
-            # Calculate discount if applicable
-            descuento = int(subtotal_original * 0.05) if aplicar_descuento else 0
+            # Calculate discount using the function
+            subtotal_final, descuento = calcular_descuento_producto(
+                producto['cantidad'],
+                producto['precio_unitario'],
+                aplicar_descuento
+            )
             total_descuentos += descuento
             
             # Update product data
             producto['precio_original'] = subtotal_original
             producto['descuento'] = descuento
-            producto['subtotal'] = subtotal_original - descuento
+            producto['subtotal'] = subtotal_final
             producto['porcentaje_descuento'] = "5%" if aplicar_descuento else "0%"
             
             # Update database
             supabase.table('pedido_producto').update({
                 'descuento': descuento,
-                'subtotal': subtotal_original - descuento
+                'subtotal': subtotal_final
             }).eq('id_pedido', id_pedido).eq('id_producto', producto['id_producto']).execute()
         
         return {
@@ -118,18 +138,20 @@ def obtener_pedidos_por_producto(id_producto: int):
         raise HTTPException(status_code=500, detail=str(ex))
 
 @router.post("/")
-def agregar_producto_a_pedido(pedido_producto: PedidoProductoCreate):
+async def agregar_producto_a_pedido(pedido_producto: PedidoProductoCreate):
     try:
         supabase = get_conexion()
-          # First get total products in order to check if discount applies
+        # First get total products in order to check if discount applies
         existing_products = supabase.table('pedido_producto').select('*').eq('id_pedido', pedido_producto.id_pedido).execute()
         total_cantidad = sum(item['cantidad'] for item in existing_products.data) + pedido_producto.cantidad
         aplicar_descuento = total_cantidad > 4
         
         # Calculate discount
-        subtotal_original = pedido_producto.cantidad * pedido_producto.precio_unitario
-        descuento = int(subtotal_original * 0.05) if aplicar_descuento else 0
-        subtotal_final = subtotal_original - descuento
+        subtotal_final, descuento = calcular_descuento_producto(
+            pedido_producto.cantidad,
+            pedido_producto.precio_unitario,
+            aplicar_descuento
+        )
         
         datos_producto = {
             "cantidad": pedido_producto.cantidad,
@@ -145,31 +167,21 @@ def agregar_producto_a_pedido(pedido_producto: PedidoProductoCreate):
         try:
             check_existente = supabase.table('pedido_producto').select('id_pedido_producto').eq('id_pedido', datos_producto['id_pedido']).eq('id_producto', datos_producto['id_producto']).execute()
             if check_existente.data and len(check_existente.data) > 0:
-                print(f"Producto ya existe en el pedido. Actualizando cantidad.")                # Calculate updated values with discount
-                total_cantidad = sum(item['cantidad'] for item in existing_products.data)
-                aplicar_descuento = total_cantidad > 4
-                
+                print(f"Producto ya existe en el pedido. Actualizando cantidad.")
                 # Recalcular todos los productos del pedido
-                all_products = supabase.table('pedido_producto').select('*').eq('id_pedido', datos_producto['id_pedido']).execute()
-                
-                if all_products.data:
-                    for prod in all_products.data:
-                        prod_subtotal = prod['cantidad'] * prod['precio_unitario']
-                        prod_descuento = int(prod_subtotal * 0.05) if aplicar_descuento else 0
-                        
-                        supabase.table('pedido_producto').update({
-                            'descuento': prod_descuento,
-                            'subtotal': prod_subtotal - prod_descuento
-                        }).eq('id_pedido', datos_producto['id_pedido']).eq('id_producto', prod['id_producto']).execute()
+                await recalcular_descuentos_pedido(pedido_producto.id_pedido)
                 
                 # Actualizar el producto actual
-                subtotal = datos_producto['cantidad'] * datos_producto['precio_unitario']
-                descuento = int(subtotal * 0.05) if aplicar_descuento else 0
+                subtotal_final, descuento = calcular_descuento_producto(
+                    datos_producto['cantidad'], 
+                    datos_producto['precio_unitario'],
+                    aplicar_descuento
+                )
                 
                 update_data = {
                     "cantidad": datos_producto['cantidad'],
                     "precio_unitario": datos_producto['precio_unitario'],
-                    "subtotal": subtotal - descuento,
+                    "subtotal": subtotal_final,
                     "descuento": descuento
                 }
                 response = supabase.table('pedido_producto').update(update_data).eq('id_pedido', datos_producto['id_pedido']).eq('id_producto', datos_producto['id_producto']).execute()
@@ -181,6 +193,10 @@ def agregar_producto_a_pedido(pedido_producto: PedidoProductoCreate):
         response = supabase.table('pedido_producto').insert(datos_producto).execute()
         
         if response.data and len(response.data) > 0:
+            # Recalcular todos los descuentos del pedido
+            await recalcular_descuentos_pedido(pedido_producto.id_pedido)
+            
+            # Actualizar stock si es necesario
             try:
                 pedido_response = supabase.table('pedido').select('medio_pago_id').eq('id_pedido', datos_producto['id_pedido']).execute()
                 
@@ -236,15 +252,16 @@ async def agregar_multiples_productos(id_pedido: int, productos: ProductosEnPedi
         print(f"Total productos en pedido: {total_cantidad}, aplicar descuento: {aplicar_descuento}")
         productos_a_insertar = []
         for producto in productos.productos:
-            # Calculate discount if applicable
-            precio = producto.precio_unitario
-            subtotal_original = precio * producto.cantidad
-            descuento = int(subtotal_original * 0.05) if aplicar_descuento else 0
-            subtotal_final = subtotal_original - descuento
-
+            # Calculate discount using the function
+            subtotal_final, descuento = calcular_descuento_producto(
+                producto.cantidad,
+                producto.precio_unitario,
+                aplicar_descuento
+            )
+            
             producto_dict = {
                 "cantidad": producto.cantidad,
-                "precio_unitario": precio,
+                "precio_unitario": producto.precio_unitario,
                 "subtotal": subtotal_final,
                 "descuento": descuento,
                 "id_pedido": id_pedido,
@@ -261,20 +278,7 @@ async def agregar_multiples_productos(id_pedido: int, productos: ProductosEnPedi
             
             if response.data:
                 # After insertion, recalculate all discounts
-                total_cantidad = sum(prod['cantidad'] for prod in productos_a_insertar)
-                aplicar_descuento = total_cantidad > 4
-                
-                if aplicar_descuento:
-                    # Update each product's discount and subtotal
-                    for producto in response.data:
-                        subtotal_original = producto['cantidad'] * producto['precio_unitario']
-                        descuento = int(subtotal_original * 0.05)
-                        subtotal_final = subtotal_original - descuento
-                        
-                        supabase.table('pedido_producto').update({
-                            'descuento': descuento,
-                            'subtotal': subtotal_final
-                        }).eq('id_pedido', id_pedido).eq('id_producto', producto['id_producto']).execute()
+                await recalcular_descuentos_pedido(id_pedido)
                 
                 if es_transferencia:
                     print(f"Actualizando stock para {len(productos_a_insertar)} productos (pago por transferencia)")
@@ -296,7 +300,12 @@ async def agregar_multiples_productos(id_pedido: int, productos: ProductosEnPedi
                         except Exception as stock_ex:
                             print(f"Error al actualizar stock del producto {producto['id_producto']}: {str(stock_ex)}")
                 
-                return {"mensaje": f"Se agregaron {len(response.data)} productos al pedido con éxito", "productos": response.data}
+                return {
+                    "mensaje": f"Se agregaron {len(response.data)} productos al pedido con éxito",
+                    "productos": response.data,
+                    "aplicar_descuento": aplicar_descuento,
+                    "total_productos": total_cantidad
+                }
             else:
                 print("No se obtuvieron datos en la respuesta de inserción de productos")
                 raise HTTPException(status_code=500, detail="Error al agregar productos al pedido: No se recibieron datos de respuesta")
@@ -310,51 +319,38 @@ async def agregar_multiples_productos(id_pedido: int, productos: ProductosEnPedi
         raise HTTPException(status_code=500, detail=str(ex))
 
 @router.put("/{id_pedido}/{id_producto}")
-def actualizar_producto_en_pedido(id_pedido: int, id_producto: int, datos: PedidoProductoUpdate):
+async def actualizar_producto_en_pedido(id_pedido: int, id_producto: int, datos: PedidoProductoUpdate):
     try:
         supabase = get_conexion()
         
-        check_existente = supabase.table('pedido_producto').select('id_pedido_producto').eq('id_pedido', id_pedido).eq('id_producto', id_producto).execute()
+        check_existente = supabase.table('pedido_producto').select('*').eq('id_pedido', id_pedido).eq('id_producto', id_producto).execute()
         if not check_existente.data or len(check_existente.data) == 0:
             raise HTTPException(status_code=404, detail="El producto no existe en el pedido especificado")
-          # Obtener todos los productos del pedido para calcular el total
-        productos_pedido = supabase.table('pedido_producto').select('*').eq('id_pedido', id_pedido).execute()
-        total_cantidad = sum(item['cantidad'] for item in productos_pedido.data)
         
-        # Si se está actualizando la cantidad, ajustar el total
-        if 'cantidad' in datos.dict() and datos.cantidad is not None:
-            # Restar la cantidad anterior y sumar la nueva
-            for prod in productos_pedido.data:
-                if prod['id_producto'] == id_producto:
-                    total_cantidad = total_cantidad - prod['cantidad'] + datos.cantidad
-                    break
+        # If quantity or price is being updated, recalculate discount
+        if 'cantidad' in datos.dict() and datos.cantidad is not None or 'precio_unitario' in datos.dict() and datos.precio_unitario is not None:
+            producto_actual = check_existente.data[0]
+            nueva_cantidad = datos.cantidad or producto_actual['cantidad']
+            nuevo_precio = datos.precio_unitario or producto_actual['precio_unitario']
+            
+            # Get total products to check if discount applies
+            total_response = supabase.table('pedido_producto').select('cantidad').eq('id_pedido', id_pedido).execute()
+            total_cantidad = sum(item['cantidad'] for item in total_response.data if item['id_producto'] != id_producto) + nueva_cantidad
+            aplicar_descuento = total_cantidad > 4
+            
+            subtotal_final, descuento = calcular_descuento_producto(nueva_cantidad, nuevo_precio, aplicar_descuento)
+            datos.subtotal = subtotal_final
+            datos.descuento = descuento
         
-        aplicar_descuento = total_cantidad > 4
-        
-        # Preparar datos de actualización
         datos_actualizar = {k: v for k, v in datos.dict().items() if v is not None}
         
         if not datos_actualizar:
             raise HTTPException(status_code=400, detail="No se proporcionaron datos para actualizar")
         
-        # Si se actualiza cantidad o precio, recalcular subtotal y descuento
-        if 'cantidad' in datos_actualizar or 'precio_unitario' in datos_actualizar:
-            # Obtener el producto actual
-            producto_actual = supabase.table('pedido_producto').select('*').eq('id_pedido', id_pedido).eq('id_producto', id_producto).execute()
-            if producto_actual.data:
-                cantidad = datos_actualizar.get('cantidad', producto_actual.data[0]['cantidad'])
-                precio = datos_actualizar.get('precio_unitario', producto_actual.data[0]['precio_unitario'])
-                
-                subtotal_original = cantidad * precio
-                descuento = int(subtotal_original * 0.05) if aplicar_descuento else 0
-                subtotal_final = subtotal_original - descuento
-                
-                datos_actualizar.update({
-                    'subtotal': subtotal_final,
-                    'descuento': descuento
-                })
-        
         response = supabase.table('pedido_producto').update(datos_actualizar).eq('id_pedido', id_pedido).eq('id_producto', id_producto).execute()
+        
+        # After update, recalculate all discounts in the order
+        await recalcular_descuentos_pedido(id_pedido)
         
         return {"mensaje": "Producto en pedido actualizado con éxito", "pedido_producto": response.data[0]}
     except Exception as ex:
@@ -363,15 +359,18 @@ def actualizar_producto_en_pedido(id_pedido: int, id_producto: int, datos: Pedid
         raise HTTPException(status_code=500, detail=str(ex))
 
 @router.delete("/{id_pedido}/{id_producto}")
-def eliminar_producto_de_pedido(id_pedido: int, id_producto: int):
+async def eliminar_producto_de_pedido(id_pedido: int, id_producto: int):
     try:
         supabase = get_conexion()
         
-        check_existente = supabase.table('pedido_producto').select('id_pedido_producto').eq('id_pedido', id_pedido).eq('id_producto', id_producto).execute()
+        check_existente = supabase.table('pedido_producto').select('*').eq('id_pedido', id_pedido).eq('id_producto', id_producto).execute()
         if not check_existente.data or len(check_existente.data) == 0:
             raise HTTPException(status_code=404, detail="El producto no existe en el pedido especificado")
         
         response = supabase.table('pedido_producto').delete().eq('id_pedido', id_pedido).eq('id_producto', id_producto).execute()
+        
+        # After deletion, recalculate discounts for remaining products
+        await recalcular_descuentos_pedido(id_pedido)
         
         return {"mensaje": "Producto eliminado del pedido con éxito"}
     except Exception as ex:
@@ -458,12 +457,15 @@ async def recalcular_descuentos_pedido(id_pedido: int):
         # Calculate total quantity to determine if discount applies
         total_cantidad = sum(item['cantidad'] for item in response.data)
         aplicar_descuento = total_cantidad > 4
-          # Update each product's discount and subtotal
+        
+        # Update each product's discount and subtotal
         actualizaciones = []
         for producto in response.data:
-            subtotal_original = producto['cantidad'] * producto['precio_unitario']
-            descuento = int(subtotal_original * 0.05) if aplicar_descuento else 0
-            subtotal_final = subtotal_original - descuento
+            subtotal_final, descuento = calcular_descuento_producto(
+                producto['cantidad'],
+                producto['precio_unitario'],
+                aplicar_descuento
+            )
             
             # Actualizar en la base de datos
             update_response = supabase.table('pedido_producto').update({
@@ -485,7 +487,8 @@ async def recalcular_descuentos_pedido(id_pedido: int):
         for producto in updated_response.data:
             if aplicar_descuento and producto['descuento'] == 0:
                 print(f"Advertencia: Producto {producto['id_producto']} no tiene descuento aplicado")
-          # Calcular totales
+        
+        # Calcular totales
         total_subtotal = sum(prod['subtotal'] for prod in updated_response.data)
         total_descuento = sum(prod['descuento'] for prod in updated_response.data)
         total_sin_descuento = total_subtotal + total_descuento
@@ -507,19 +510,3 @@ async def recalcular_descuentos_pedido(id_pedido: int):
         if isinstance(ex, HTTPException):
             raise ex
         raise HTTPException(status_code=500, detail=str(ex))
-
-def calcular_descuento_producto(cantidad: int, precio_unitario: int, aplicar_descuento: bool = False) -> tuple[int, int]:
-    """Calcula el descuento y subtotal para un producto.
-    
-    Args:
-        cantidad: Cantidad del producto.
-        precio_unitario: Precio por unidad.
-        aplicar_descuento: Si se debe aplicar el descuento del 5%.
-        
-    Returns:
-        tuple[int, int]: (subtotal_final, descuento)
-    """
-    subtotal_original = cantidad * precio_unitario
-    descuento = int(subtotal_original * 0.05) if aplicar_descuento else 0
-    subtotal_final = subtotal_original - descuento
-    return (subtotal_final, descuento)
