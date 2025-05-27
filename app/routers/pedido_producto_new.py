@@ -326,7 +326,7 @@ async def agregar_multiples_productos(id_pedido: int, productos: ProductosEnPedi
         raise HTTPException(status_code=500, detail=str(ex))
 
 @router.put("/{id_pedido}/{id_producto}")
-async def actualizar_producto_en_pedido(id_pedido: int, id_producto: int, datos: PedidoProductoUpdate):
+def actualizar_producto_en_pedido(id_pedido: int, id_producto: int, datos: PedidoProductoUpdate):
     try:
         supabase = get_conexion()
         
@@ -369,9 +369,6 @@ async def actualizar_producto_en_pedido(id_pedido: int, id_producto: int, datos:
         
         response = supabase.table('pedido_producto').update(datos_actualizar).eq('id_pedido', id_pedido).eq('id_producto', id_producto).execute()
         
-        # Recalcular descuentos para todos los productos después de la actualización
-        await recalcular_descuentos_pedido(id_pedido)
-        
         return {"mensaje": "Producto en pedido actualizado con éxito", "pedido_producto": response.data[0]}
     except Exception as ex:
         if isinstance(ex, HTTPException):
@@ -379,7 +376,7 @@ async def actualizar_producto_en_pedido(id_pedido: int, id_producto: int, datos:
         raise HTTPException(status_code=500, detail=str(ex))
 
 @router.delete("/{id_pedido}/{id_producto}")
-async def eliminar_producto_de_pedido(id_pedido: int, id_producto: int):
+def eliminar_producto_de_pedido(id_pedido: int, id_producto: int):
     try:
         supabase = get_conexion()
         
@@ -388,9 +385,6 @@ async def eliminar_producto_de_pedido(id_pedido: int, id_producto: int):
             raise HTTPException(status_code=404, detail="El producto no existe en el pedido especificado")
         
         response = supabase.table('pedido_producto').delete().eq('id_pedido', id_pedido).eq('id_producto', id_producto).execute()
-        
-        # After deletion, recalculate discounts for remaining products
-        await recalcular_descuentos_pedido(id_pedido)
         
         return {"mensaje": "Producto eliminado del pedido con éxito"}
     except Exception as ex:
