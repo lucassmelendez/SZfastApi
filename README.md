@@ -49,50 +49,18 @@ Una API REST robusta para la gestión de clientes, empleados, pedidos y producto
    cd SZfastApi
    ```
 
-2. **Crea un entorno virtual** (recomendado):
-   ```bash
-   # En Windows
-   python -m venv venv
-   .\venv\Scripts\activate
-
-   # En macOS/Linux
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-
-3. **Instala las dependencias**:
+2. **Instala las dependencias**:
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Configura las variables de entorno**:
+3. **Configura las variables de entorno**:
    
    Crea un archivo `.env` en la raíz del proyecto:
    ```
    SUPABASE_URL=https://tu-proyecto.supabase.co
    SUPABASE_KEY=tu-api-key-de-supabase
    ```
-
-   También puedes usar el script de configuración:
-   ```bash
-   python scripts/setup_env.py
-   ```
-
-## ⚙️ Configuración de Supabase
-
-1. Crea una cuenta en [Supabase](https://supabase.com/)
-2. Crea un nuevo proyecto
-3. En el SQL Editor, ejecuta el script ubicado en:
-   ```bash
-   # Para estructura completa
-   scripts/init_supabase_tables.sql
-   
-   # O para estructura básica
-   scripts/init_supabase.sql
-   ```
-
-4. Obtén la URL y API Key desde la sección "Settings" > "API" del proyecto en Supabase
-5. Actualiza el archivo `.env` con tus credenciales
 
 ## 🗄️ Estructura del Proyecto
 
@@ -109,13 +77,8 @@ SZfastApi/
 │       ├── pedidos.py      # Rutas para gestión de pedidos
 │       └── pedido_producto.py # Rutas para productos en pedidos
 ├── scripts/                # Scripts de utilidad
-│   ├── init_supabase_tables.sql   # Script SQL para crear tablas
-│   ├── init_supabase.sql          # Script SQL básico
-│   ├── setup_env.py               # Configuración de variables de entorno
 │   ├── iniciar_app.py             # Script para iniciar la aplicación
-│   └── verificar_vercel.py        # Verificación de despliegue en Vercel
 ├── .env                    # Variables de entorno (no incluido en el repositorio)
-├── .gitignore              # Archivos y directorios ignorados por git
 ├── requirements.txt        # Dependencias del proyecto
 ├── vercel.json             # Configuración para despliegue en Vercel
 └── README.md               # Documentación del proyecto
@@ -128,10 +91,6 @@ El sistema utiliza las siguientes tablas principales:
 ### Tabla `rol`
 - `id_rol`: ID único del rol (PK)
 - `nombre_rol`: Nombre del rol
-
-### Tabla `informe`
-- `id_informe`: ID único del informe (PK)
-- `descripcion`: Descripción del informe
 
 ### Tabla `cliente`
 - `id_cliente`: ID único del cliente (PK)
@@ -154,7 +113,6 @@ El sistema utiliza las siguientes tablas principales:
 - `direccion`: Dirección física
 - `telefono`: Número de teléfono
 - `rol_id`: Referencia a la tabla rol (FK)
-- `informe_id`: Referencia a la tabla informe (FK)
 
 ### Tabla `pedido` y `pedido_producto`
 Revisa el script SQL para detalles sobre las tablas de pedidos y productos.
@@ -175,20 +133,11 @@ python scripts/iniciar_app.py
 
 La API estará disponible en [http://localhost:8000](http://localhost:8000)
 
-### Testing
-
-Para verificar la configuración de Vercel antes del despliegue:
-
-```bash
-python scripts/verificar_vercel.py
-```
-
 ## 📝 Documentación de la API
 
 La documentación automática de la API estará disponible en:
 
 - **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **ReDoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
 ## 🔌 Endpoints
 
@@ -252,34 +201,7 @@ Esta API está configurada para ser desplegada en Vercel. Para desplegarla, sigu
 4. Despliega tu proyecto:
    - Usando la CLI (desde la raíz del proyecto):
      ```bash
-     vercel
+     vercel --prod
      ```
-   - O conecta tu repositorio a Vercel y configura el despliegue automático
 
-5. Tu API estará disponible en la URL proporcionada por Vercel (ejemplo: [https://szfast-api.vercel.app](https://szfast-api.vercel.app))
-
-### Consideraciones para el despliegue en Vercel
-
-- Vercel ofrece funciones sin servidor, por lo que cada solicitud a la API iniciará una nueva instancia de la función
-- Las conexiones a la base de datos deben establecerse para cada solicitud
-- Hay límites en el tiempo de ejecución (no adecuado para operaciones de larga duración)
-- Las funciones sin servidor de Vercel tienen un límite de 50MB para el tamaño del paquete, incluyendo dependencias
-
-## 🧪 Contribuciones
-
-Las contribuciones son bienvenidas. Para contribuir:
-
-1. Haz un fork del repositorio
-2. Crea una rama para tu feature (`git checkout -b feature/amazing-feature`)
-3. Realiza tus cambios
-4. Haz commit de tus cambios (`git commit -m 'Add some amazing feature'`)
-5. Push a la rama (`git push origin feature/amazing-feature`)
-6. Abre un Pull Request
-
-## 📄 Licencia
-
-Este proyecto está bajo la Licencia [MIT](https://opensource.org/licenses/MIT).
-
----
-
-Desarrollado por [Lucas Meléndez](https://github.com/lucassmelendez) 
+5. URL de Produccion: [https://szfast-api.vercel.app](https://szfast-api.vercel.app))
